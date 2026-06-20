@@ -36,20 +36,14 @@ class _FakeGrammar:
 
 
 class _FakeSpecAlgorithm:
-    def __init__(self, is_dflash: bool = False):
-        self._is_dflash = is_dflash
-
     def is_none(self) -> bool:
         return False
 
-    def is_dflash(self) -> bool:
-        return self._is_dflash
-
 
 class _FakeBatch:
-    def __init__(self, reqs, is_dflash: bool = False):
+    def __init__(self, reqs):
         self.reqs = reqs
-        self.spec_algorithm = _FakeSpecAlgorithm(is_dflash)
+        self.spec_algorithm = _FakeSpecAlgorithm()
 
 
 def _make_processor() -> SchedulerBatchResultProcessor:
@@ -119,20 +113,6 @@ class TestSpecV2GrammarTruncation(CustomTestCase):
         result = _make_result(4, [3], [201, 202, 203, 0])
 
         predict_tokens = proc._resolve_spec_v2_tokens(result, _FakeBatch([req]))
-
-        self.assertEqual(predict_tokens, [[201, 202, 203]])
-        self.assertEqual(req.kv_committed_len, 3)
-
-    def test_resolve_dflash_matches_eagle(self):
-        # The is_dflash() fork is gone: no worker pre-claims the bonus, so resolve
-        # commits the full accepted run identically for EAGLE and DFLASH.
-        req = _make_req(terminate_after=99)
-        proc = _make_processor()
-        result = _make_result(4, [3], [201, 202, 203, 0])
-
-        predict_tokens = proc._resolve_spec_v2_tokens(
-            result, _FakeBatch([req], is_dflash=True)
-        )
 
         self.assertEqual(predict_tokens, [[201, 202, 203]])
         self.assertEqual(req.kv_committed_len, 3)
