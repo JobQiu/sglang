@@ -527,15 +527,21 @@ class StreamingSession(BasePrefixCache):
         req.swa_evicted_seqlen = min(req.swa_evicted_seqlen, prefix_len)
 
     def _trim_overshoot(self, req: Req, finished_len: int) -> None:
-        """Trim slot KV to finished_len boundary. Spec v2 may overshoot
-        max_new_tokens (verify round commits M+1 at a time); next turn's
-        input is output_ids[:finished_len], so positions past that must
-        be released to avoid token/KV mismatch.
+        """Reconcile slot KV to the finished boundary before save.
+
+        ``target = origin + finished_len`` is the authoritative committed length
+        at finish: output_ids[:finished_len] all have their KV written. Set
+        kv_committed_len to it directly (not ``min``): spec v2 may *overshoot*
+        (a verify round commits M+1, so positions past finished_len are released)
+        or, under overlap, *undershoot* -- kv_committed_len honestly lags the
+        in-flight verify by ~1, so it is short at save time. ``min`` fixes only
+        overshoot; the explicit set also covers the lag, so save_from_req captures
+        the full committed prefix instead of one token short.
         """
         target = len(req.origin_input_ids) + finished_len
         self._free_kv_aligned(req.req_pool_idx, target, req.kv_allocated_len)
         req.kv_allocated_len = min(req.kv_allocated_len, target)
-        req.kv_committed_len = min(req.kv_committed_len, target)
+        req.kv_committed_len = target
         req.swa_evicted_seqlen = min(req.swa_evicted_seqlen, target)
         req.output_ids = req.output_ids[:finished_len]
 
